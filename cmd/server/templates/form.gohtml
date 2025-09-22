@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="pageTitle">{{- /*gotype: parentscontactform/internal/models.TemplateData*/ -}}
+        {{.}}</title>
+    <link rel="stylesheet" href="/static/css/form.css">
+</head>
+<body>
+<!-- Navigation Bar -->
+<nav class="navbar">
+    <div class="navbar__welcome">Welcome, <span class="navbar__user">{{.CurrentUserInfo.FirstName}} {{.CurrentUserInfo.Surname}}</span></div>
+    <div>
+        <a href="/manage" class="btn--logout">Admin</a>
+        <a href="/logout" class="btn--logout">Log Out</a>
+    </div>
+</nav>
+
+<!-- Main Content -->
+<main class="container">
+    <div class="form-card">
+        <div class="form-header">
+            <h1>Please Update Your Details</h1>
+            <div id="backBtn" class="backBtn" onclick="showContactCards()">
+                ← Back
+            </div>
+        </div>
+
+        <div id="contact-cards" class="contact-cards">
+            <div class="contact-cards__header">
+                <h2>Select Contact</h2>
+                <p id="selectContactSubtitle">Please choose the contact to update</p>
+            </div>
+
+            <div class="contact-cards__grid">
+                <!-- Contact Card 1 -->
+                <div id="primaryCard" class="contact-card" onclick="showContactForm('primaryContactForm')">
+                    <div class="contact-card__content">
+                        <div id="primaryCardInitial" class="contact-card__avatar">{{.ParentContactInfo.Initials}}</div>
+                        <div class="contact-card__info">
+                            <h3 class="contact-card__name">{{.ParentContactInfo.Forename}} {{.ParentContactInfo.Surname}}</h3>
+                            <p class="contact-card__relationship">Primary</p>
+                        </div>
+                    </div>
+                    <div class="contact-card__indicator">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+
+                <!-- Contact Card 2 -->
+                <div id="secondaryCard" class="contact-card" onclick="showContactForm('secondaryContactForm')">
+                    <div class="contact-card__content">
+                        <div id="secondaryCardInitial" class="contact-card__avatar">{{.ParentContactInfo.SecondaryInitials}}</div>
+                        <div class="contact-card__info">
+                            <h3 class="contact-card__name">{{.ParentContactInfo.SecondaryForename}} {{.ParentContactInfo.SecondarySurname}}</h3>
+                            <p class="contact-card__relationship">Secondary</p>
+                        </div>
+                    </div>
+                    <div class="contact-card__indicator">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <form id="primaryContactForm">
+            <!-- Example Form Fields - Customize these! -->
+
+            <div class="form-group">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{.ParentContactInfo.EmailAddress1}}" readonly>
+                <small style="color: #6c757d; display: block; margin-top: 0.25rem;">Email cannot be changed.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="title" class="form-label">Title</label>
+                <select id="title" name="title" class="form-control">
+                    <option value="">Please select...</option>
+                    <option value="Mr"   {{if eq .ParentContactInfo.Title "Mr"}}selected{{end}}>Mr</option>
+                    <option value="Mrs"  {{if eq .ParentContactInfo.Title "Mrs"}}selected{{end}}>Mrs</option>
+                    <option value="Miss" {{if eq .ParentContactInfo.Title "Miss"}}selected{{end}}>Miss</option>
+                    <option value="Ms"   {{if eq .ParentContactInfo.Title "Ms"}}selected{{end}}>Ms</option>
+                    <option value="Dr"   {{if eq .ParentContactInfo.Title "Dr"}}selected{{end}}>Dr</option>
+                    <option value="Prof" {{if eq .ParentContactInfo.Title "Prof"}}selected{{end}}>Professor</option>
+                    <option value="Fr"  {{if eq .ParentContactInfo.Title "Fr"}}selected{{end}}>Fr</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="forename" class="form-label">Forename</label>
+                <input type="text" class="form-control" id="forename" name="forename" value="{{or .ParentContactInfo.Forename ""}}">
+            </div>
+
+            <div class="form-group">
+                <label for="surname" class="form-label">Surname</label>
+                <input type="text" class="form-control" id="surname" name="surname" value="{{or .ParentContactInfo.Surname ""}}">
+            </div>
+
+            <div id="addressSearch" class="form-group">
+                <label for="autocomplete" class="form-label">Address Search</label>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine0" class="form-label">Address Line 1</label>
+                <input type="text" class="form-control" id="addressLine0" name="addressLineOne" placeholder="Enter in Address Search" value="{{or .ParentContactInfo.FirstLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine1" class="form-label">Address Line 2</label>
+                <input type="text" class="form-control" id="addressLine1" name="addressLineTwo"  value="{{or .ParentContactInfo.SecondLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine2" class="form-label">Address Line 3</label>
+                <input type="text" class="form-control" id="addressLine2" name="addressLineThree"  value="{{or .ParentContactInfo.ThirdLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="postalCode" class="form-label">Post Code</label>
+                <input type="text" class="form-control" id="postalCode" name="postalCode" value="{{or .ParentContactInfo.Postcode ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="county" class="form-label">County</label>
+                <input type="text" class="form-control" id="county" name="county" value="{{or .ParentContactInfo.County ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="phone" class="form-label">Phone Number</label>
+                <input type="tel" class="form-control" id="phone" name="phone" placeholder="e.g., +44 20 7946 0958" value="{{or .ParentContactInfo.Mobile1 ""}}">
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn--submit">Save Changes</button>
+            </div>
+        </form>
+
+        <form id="secondaryContactForm">
+            <!-- Example Form Fields - Customize these! -->
+
+            <div class="form-group">
+                <label for="email" class="form-label">Email Address</label>
+                <input type="email" class="form-control" id="email" name="email" value="{{.ParentContactInfo.EmailAddress2}}" readonly>
+                <small style="color: #6c757d; display: block; margin-top: 0.25rem;">Email cannot be changed.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="title" class="form-label">Title</label>
+                <select id="title" name="title" class="form-control">
+                    <option value="">Please select...</option>
+                    <option value="Mr"   {{if eq .ParentContactInfo.SecondaryTitle "Mr"}}selected{{end}}>Mr</option>
+                    <option value="Mrs"  {{if eq .ParentContactInfo.SecondaryTitle "Mrs"}}selected{{end}}>Mrs</option>
+                    <option value="Miss" {{if eq .ParentContactInfo.SecondaryTitle "Miss"}}selected{{end}}>Miss</option>
+                    <option value="Ms"   {{if eq .ParentContactInfo.SecondaryTitle "Ms"}}selected{{end}}>Ms</option>
+                    <option value="Dr"   {{if eq .ParentContactInfo.SecondaryTitle "Dr"}}selected{{end}}>Dr</option>
+                    <option value="Prof" {{if eq .ParentContactInfo.SecondaryTitle "Prof"}}selected{{end}}>Professor</option>
+                    <option value="Fr"  {{if eq .ParentContactInfo.SecondaryTitle "Fr"}}selected{{end}}>Fr</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="forename" class="form-label">Forename</label>
+                <input type="text" class="form-control" id="forename" name="forename" value="{{or .ParentContactInfo.SecondaryForename ""}}">
+            </div>
+
+            <div class="form-group">
+                <label for="surname" class="form-label">Surname</label>
+                <input type="text" class="form-control" id="surname" name="surname" value="{{or .ParentContactInfo.SecondarySurname ""}}">
+            </div>
+
+            <div id="addressSearchTwo" class="form-group">
+                <label for="autocomplete" class="form-label">Address Search</label>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine0" class="form-label">Address Line 1</label>
+                <input type="text" class="form-control" id="secondaryAddressLine0" name="addressLineOne" placeholder="Enter in Address Search" value="{{or .ParentContactInfo.FirstLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine1" class="form-label">Address Line 2</label>
+                <input type="text" class="form-control" id="secondaryAddressLine1" name="addressLineTwo"  value="{{or .ParentContactInfo.SecondLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="addressLine2" class="form-label">Address Line 3</label>
+                <input type="text" class="form-control" id="secondaryAddressLine2" name="addressLineThree"  value="{{or .ParentContactInfo.ThirdLineAddress ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="postalCode" class="form-label">Post Code</label>
+                <input type="text" class="form-control" id="secondaryPostalCode" name="postalCode" value="{{or .ParentContactInfo.Postcode ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="county" class="form-label">County</label>
+                <input type="text" class="form-control" id="secondaryCounty" name="county" value="{{or .ParentContactInfo.County ""}}" readonly>
+            </div>
+
+            <div class="form-group">
+                <label for="phone" class="form-label">Phone Number</label>
+                <input type="tel" class="form-control" id="phone" name="phone" placeholder="e.g., +44 20 7946 0958" value="{{or .ParentContactInfo.Mobile2 ""}}">
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn--submit">Save Changes</button>
+            </div>
+        </form>
+
+        <div id="success-message" class="alert alert-success" style="display: none;">
+            <strong>Thank you!</strong> Your details have been successfully updated.
+        </div>
+    </div>
+</main>
+
+<script>
+    (g=>{var h,a,k,p="The Google Maps JavaScript API",c="google",l="importLibrary",q="__ib__",m=document,b=window;b=b[c]||(b[c]={});var d=b.maps||(b.maps={}),r=new Set,e=new URLSearchParams,u=()=>h||(h=new Promise(async(f,n)=>{await (a=m.createElement("script"));e.set("libraries",[...r]+"");for(k in g)e.set(k.replace(/[A-Z]/g,t=>"_"+t[0].toLowerCase()),g[k]);e.set("callback",c+".maps."+q);a.src=`https://maps.${c}apis.com/maps/api/js?`+e;d[q]=f;a.onerror=()=>h=n(Error(p+" could not load."));a.nonce=m.querySelector("script[nonce]")?.nonce||"";m.head.append(a)}));d[l]?console.warn(p+" only loads once. Ignoring:",g):d[l]=(f,...n)=>r.add(f)&&u().then(()=>d[l](f,...n))})({
+        key: "AIzaSyBxUJIUrcYYrVqWyg_kxqD0DA197w17yOc",
+        v: "weekly",
+        // Use the 'v' parameter to indicate the version to use (weekly, beta, alpha, etc.).
+        // Add other bootstrap parameters as needed, using camel case.
+    });
+</script>
+<script src="/static/js/form.js"></script>
+</body>
+</html>

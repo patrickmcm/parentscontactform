@@ -20,7 +20,7 @@ func HandleLoginGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	loginHtml, err := os.ReadFile("C:\\Users\\Patrick\\GolandProjects\\parentscontactform\\cmd\\server\\static\\login.html")
+	loginHtml, err := os.ReadFile("/Users/patrickmcm/GolandProjects/parentscontactform/cmd/server/static/login.html")
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

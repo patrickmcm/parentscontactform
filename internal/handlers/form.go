@@ -2,18 +2,26 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"html/template"
+	"io"
 	"net/http"
 	"parentscontactform/internal/auth"
 	"parentscontactform/internal/client"
 	"parentscontactform/internal/middleware"
 	"parentscontactform/internal/models"
 	"parentscontactform/internal/session"
+	"parentscontactform/internal/util"
 	"strings"
+	"time"
 )
 
+var RestClient *client.ClientWithResponses
+
 func HandleFormGet(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
 	// 1. Get the session cookie
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
@@ -43,14 +51,50 @@ func HandleFormGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	t, err := template.ParseFiles("C:\\Users\\Patrick\\GolandProjects\\parentscontactform\\cmd\\server\\templates\\form.gohtml")
+	parentChildren, err := client.GetUserChildren(sessionData)
 	if err != nil {
-		middleware.LogAndError(r, w, "failed to parse gohtml", err.Error(), http.StatusInternalServerError)
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+	}
+
+	/*
+		NEXT STEPS:
+			1. Get each childs med info (conditions, general consent)
+			2. Fetch custom fields for photos consent
+			3. Fetch if EAL
+	*/
+
+	medicalConditionsList, err := RestClient.GetApiMedicalConditiontypesWithResponse(ctx, nil)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	languagesList, err := RestClient.GetApiSystemconfigurationListLanguagesWithResponse(ctx, nil)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if languagesList == nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	templateData := models.TemplateData{
 		CurrentUserInfo: currentUserInfo,
+		ChildrenInfo:    parentChildren,
+		ConditionTypes:  *medicalConditionsList.JSON200.ConditionTypes,
+		Languages:       *languagesList.JSON200.Items,
+	}
+
+	funcMap := template.FuncMap{
+		"ptrEq": util.PtrEq,
+	}
+
+	t, err := template.New("form.gohtml").Funcs(funcMap).ParseFiles("/Users/patrickmcm/GolandProjects/parentscontactform/cmd/server/templates/form.gohtml")
+	if err != nil {
+		middleware.LogAndError(r, w, "failed to parse gohtml", err.Error(), http.StatusInternalServerError)
+		return
 	}
 
 	if len(parentInfo) > 0 {
@@ -62,6 +106,310 @@ func HandleFormGet(w http.ResponseWriter, r *http.Request) {
 		middleware.LogAndError(r, w, "failed to execute template", err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func HandleChildFormGet(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	// 1. Get the session cookie
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		// No cookie, not logged in
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	// 2. Look up the session from memory
+	sessionData, exists := session.Get(cookie.Value)
+
+	if !exists {
+		// Session not found (e.g., server was restarted)
+		http.Redirect(w, r, "/", http.StatusFound)
+		return
+	}
+
+	parentChildren, err := client.GetUserChildren(sessionData)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+	}
+
+	childrenInfo := make(map[string]models.ChildFormInfo)
+
+	for _, child := range parentChildren {
+		var childFormInfo models.ChildFormInfo
+
+		if child.Status < 1 {
+			continue
+		}
+
+		childrenConditionsInfo, err := RestClient.GetApiMedicalStudentsSchoolIdConditionsWithResponse(ctx, child.SchoolId, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if childrenConditionsInfo.JSON200.Conditions != nil {
+			childFormInfo.Conditions = *childrenConditionsInfo.JSON200.Conditions
+		}
+
+		photosConsent, err := RestClient.GetApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, child.SchoolId, 27, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if photosConsent.JSON200 != nil {
+			customField := *(*photosConsent.JSON200.CustomFields)[0].Value
+			if customField == "true" {
+				childFormInfo.PhotoConsent = true
+			} else {
+				childFormInfo.PhotoConsent = false
+			}
+		}
+
+		medConsentResp, err := RestClient.GetApiMedicalStudentsSchoolIdConsentsWithResponse(ctx, child.SchoolId, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if medConsentResp.JSON200 != nil {
+			consents := *medConsentResp.JSON200.Consents
+			for _, consent := range consents {
+				if *consent.TypeId == 18 {
+					childFormInfo.MedConsent = *consent.ConsentGiven
+				}
+			}
+		}
+
+		studentResp, err := RestClient.GetApiStudentsSchoolIdWithResponse(ctx, child.SchoolId, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if studentResp.JSON200 != nil {
+			childFormInfo.Languages = *studentResp.JSON200.Languages
+		}
+
+		childrenInfo[child.SchoolId] = childFormInfo
+	}
+
+	encoded, err := json.Marshal(childrenInfo)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to marshal children info", err.Error(), http.StatusInternalServerError)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Write(encoded)
+}
+
+func HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+
+	cookie, err := r.Cookie("session_id")
+	if err != nil {
+		// No cookie, not logged in
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	_, exists := session.Get(cookie.Value)
+
+	if !exists {
+		// Session not found (e.g., server was restarted)
+		http.Redirect(w, r, "/login", http.StatusFound)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		middleware.LogAndError(r, w, "malformed body", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var childInfo models.ChildFormInfoRequestBody
+	err = json.Unmarshal(body, &childInfo)
+	if err != nil {
+		middleware.LogAndError(r, w, "malformed body", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	for _, condition := range childInfo.ToDelete {
+		delConditionResp, err := RestClient.DeleteApiMedicalStudentsSchoolIdConditionsConditionIdWithResponse(ctx, childInfo.SchoolId, condition.Key, nil)
+		if err != nil || delConditionResp == nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if delConditionResp.StatusCode() != http.StatusOK {
+			middleware.LogAndError(r, w, "Unable to delete condition", string(delConditionResp.Body), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	for _, condition := range childInfo.Conditions {
+		if condition.ToBeUploaded && condition.Key != "" {
+			op := "replace"
+
+			groupIdPath := "/GroupId"
+			typePath := "/Type"
+			furtherInfoPath := "/FurtherInfo"
+			treatmentPath := "/Treatment"
+
+			groupIdStr := string(rune(condition.GroupId))
+
+			updateBody := client.PatchApiMedicalStudentsSchoolIdConditionsConditionIdJSONBody{
+				{
+					Op:    &op,
+					Path:  &groupIdPath,
+					Value: &groupIdStr,
+				},
+				{
+					Op:    &op,
+					Path:  &typePath,
+					Value: &condition.Type,
+				},
+				{
+					Op:    &op,
+					Path:  &furtherInfoPath,
+					Value: &condition.FurtherInfo,
+				},
+				{
+					Op:    &op,
+					Path:  &treatmentPath,
+					Value: &condition.Treatment,
+				},
+			}
+			updatedCondResp, err := RestClient.PatchApiMedicalStudentsSchoolIdConditionsConditionIdWithResponse(ctx, childInfo.SchoolId, condition.Key, nil, updateBody)
+			if err != nil {
+				middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			if updatedCondResp.StatusCode() != 200 {
+				middleware.LogAndError(r, w, "Unable to update condition", string(updatedCondResp.Body), http.StatusInternalServerError)
+				return
+			}
+		} else if condition.ToBeUploaded && condition.Key == "" {
+			now := time.Now().Format(time.RFC3339)
+			newConditionBody := client.PostApiMedicalStudentsSchoolIdConditionsJSONRequestBody{
+				DateEntered: &now,
+				FurtherInfo: &condition.FurtherInfo,
+				GroupId:     &condition.GroupId,
+				Treatment:   &condition.Treatment,
+				Type:        &condition.Type,
+			}
+			newConditionResp, err := RestClient.PostApiMedicalStudentsSchoolIdConditionsWithResponse(ctx, childInfo.SchoolId, nil, newConditionBody)
+			if err != nil || newConditionResp.StatusCode() != 201 {
+				middleware.LogAndError(r, w, "Unable to connect to iSAMS", string(newConditionResp.Body), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	photoConsent := "false"
+	if childInfo.PhotoConsent {
+		photoConsent = "true"
+	}
+
+	updatedPhotoConsent := client.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdJSONRequestBody{
+		Value: &photoConsent,
+	}
+
+	photoConsentResp, err := RestClient.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, childInfo.SchoolId, 27, nil, updatedPhotoConsent)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if photoConsentResp.StatusCode() != 200 {
+		middleware.LogAndError(r, w, "Unable to update condition", string(photoConsentResp.Body), http.StatusInternalServerError)
+		return
+	}
+
+	// med consent
+
+	medConsentsResp, err := RestClient.GetApiMedicalStudentsSchoolIdConsentsWithResponse(ctx, childInfo.SchoolId, nil)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if medConsentsResp.JSON200 == nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	medConsent := "false"
+	if childInfo.MedConsent {
+		medConsent = "true"
+	}
+
+	foundConsentRecord := false
+
+	for _, consent := range *medConsentsResp.JSON200.Consents {
+		if *consent.TypeId == 18 {
+			foundConsentRecord = true
+			op := "replace"
+			consentGivenPath := "/ConsentGiven"
+			updatedMedConsent := client.PatchApiMedicalStudentsSchoolIdConsentsConsentIdJSONBody{
+				{
+					Op:    &op,
+					Path:  &consentGivenPath,
+					Value: &medConsent,
+				},
+			}
+
+			updatedConsentResp, err := RestClient.PatchApiMedicalStudentsSchoolIdConsentsConsentIdWithResponse(ctx, childInfo.SchoolId, *consent.Key, nil, updatedMedConsent)
+			if err != nil || updatedConsentResp.StatusCode() != 200 {
+				middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+				return
+			}
+		}
+	}
+
+	if !foundConsentRecord {
+		now := time.Now().Format(time.DateOnly)
+		typeId := 18
+		newConsentBody := client.PostApiMedicalStudentsSchoolIdConsentsJSONRequestBody{
+			ConsentGiven: &childInfo.MedConsent,
+			ReceivedDate: &now,
+			TypeId:       &typeId,
+		}
+		newConsentResp, err := RestClient.PostApiMedicalStudentsSchoolIdConsentsWithResponse(ctx, childInfo.SchoolId, nil, newConsentBody)
+		if err != nil || newConsentResp.StatusCode() != 200 {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// eal
+
+	currentStudentInfoResp, err := RestClient.GetApiStudentsSchoolIdWithResponse(ctx, childInfo.SchoolId, nil)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if currentStudentInfoResp.JSON200 == nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", string(currentStudentInfoResp.Body), http.StatusInternalServerError)
+		return
+	}
+
+	updatedStudentBody := util.InitStudent(currentStudentInfoResp.JSON200)
+
+	childInfo.Languages = append(childInfo.Languages, "English")
+
+	updatedStudentBody.Languages = &childInfo.Languages
+
+	updatedLangsResp, err := RestClient.PutApiStudentsSchoolIdWithResponse(ctx, childInfo.SchoolId, nil, updatedStudentBody)
+	if err != nil || updatedLangsResp.StatusCode() != 200 {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "OK")
 }
 
 func HandleFormPost(w http.ResponseWriter, r *http.Request) {
@@ -96,7 +444,14 @@ func HandleFormPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	parentChildren, err := client.GetUserChildren(sessionData)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+	}
+
 	contactInfo, err := client.GetContactInfo(sessionData.ISAMSSessionId)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+	}
 
 	formType := r.Form.Get("contactType")
 

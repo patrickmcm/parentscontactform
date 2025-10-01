@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"parentscontactform/internal/auth"
+	"parentscontactform/internal/client"
 	"parentscontactform/internal/handlers"
 )
 
@@ -19,12 +20,22 @@ func main() {
 		log.Fatalf("Failed to setup OIDC: %v", err)
 	}
 
-	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("C:\\Users\\Patrick\\GolandProjects\\parentscontactform\\cmd\\server\\static"))))
+	hc := client.GetHTTPClient()
+	c, err := client.NewClientWithResponses(client.BASE_URL, client.WithHTTPClient(&hc))
+	if err != nil {
+		log.Fatal("Failed to init iSAMS API Client")
+	}
+
+	handlers.RestClient = c
+
+	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("/Users/patrickmcm/GolandProjects/parentscontactform/cmd/server/static"))))
 
 	http.HandleFunc("/", handlers.HandleLoginGet)
 	http.HandleFunc("/login", handlers.HandleLoginPost)
 	http.HandleFunc("/logout", handlers.HandleLogoutGet)
 	http.HandleFunc("/form", handlers.HandleFormGet)
+	http.HandleFunc("/children", handlers.HandleChildFormGet)
+	http.HandleFunc("/updateChildren", handlers.HandleChildFormPost)
 	http.HandleFunc("/callback", handlers.HandleCallback)
 	http.HandleFunc("/submit", handlers.HandleFormPost)
 

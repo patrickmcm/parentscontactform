@@ -1,30 +1,38 @@
 document.getElementById("pageTitle").innerHTML = "Update Your Details | Fidelis College"
 
-const primaryForm = document.getElementById('primaryContactForm');
-const secondaryForm = document.getElementById('secondaryContactForm');
+const forms = document.getElementsByTagName("form")
 
-const forms = [primaryForm,secondaryForm]
+let personIndex = -1;
+let children;
+let editingIndex = -1;
 
 function showContactCards() {
     let contactCards = document.getElementById("contact-cards")
     let backBtn = document.getElementById("backBtn")
     let successMsg = document.getElementById("success-message")
+    let selectLang = document.getElementById("ealSpoken").children
     let activeForm;
 
     for (const form of forms) {
-        if (form.style.display === "") {
+        if (form.style.display === "" && form.id !== "conditionForm") {
             activeForm = form
         }
     }
 
-    if (activeForm) {
-        activeForm.style.display = "none"
+    if(!activeForm || confirm("Are you sure you want to go back? All unsaved changes will be lost.")) {
+        for (const option of selectLang) {
+            option.selected = false
+        }
+
+        if (activeForm) {
+            activeForm.style.display = "none"
+        }
+
+        backBtn.style.display = "none"
+        successMsg.style.display = "none"
+
+        contactCards.style.display = ""
     }
-
-    backBtn.style.display = "none"
-    successMsg.style.display = "none"
-
-    contactCards.style.display = ""
 }
 
 function showContactForm(formName) {
@@ -42,6 +50,42 @@ function showContactForm(formName) {
 
     chosenForm.style.display = ""
     backBtn.style.display = "inline-flex"
+}
+
+function showChildForm(schoolId) {
+    let childForm = document.getElementById("childForm")
+
+    let medConsentSuffixId = "-med-consent"
+    let photoConsentSuffixId ="-photo-consent"
+
+    personIndex = schoolId
+
+    fetch('/children').then(async (resp) => {
+        children = await resp.json()
+
+        if(children[personIndex]["photoConsent"]) {
+            document.getElementById("yes-photo-consent").checked = true
+        } else {
+            document.getElementById("no-photo-consent").checked = true
+        }
+
+        if(children[personIndex]["medConsent"]) {
+            document.getElementById("yes-med-consent").checked = true
+        } else {
+            document.getElementById("no-med-consent").checked = true
+        }
+
+        children[personIndex]["toDelete"] = []
+
+        for (const lang of children[personIndex]["languages"]) {
+            document.getElementById(lang).selected = true
+        }
+
+        renderConditionsTable()
+        showContactForm("childForm")
+    }).catch(err => {
+        console.log(err)
+    })
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -67,7 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     for (const form of forms) {
-        form.style.display = 'none'
+        if(form.id !== "conditionForm") {
+            form.style.display = "none"
+        }
 
         form.addEventListener('submit', async function(event) {
             // Prevent the default form submission (which causes a redirect)
@@ -86,10 +132,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
             try {
                 // Send the form data to your server endpoint
-                const response = await fetch('/submit', {
-                    method: 'POST',
-                    body: formData
-                });
+                let response;
+                if(form.id === "childForm") {
+                    let formPhotoConsent = formData.get("photoConsent") === "yes"
+                    let formMedConsent = formData.get("medConsent") === "yes"
+                    let languagesSelected = formData.getAll("ealSpoken")
+
+                    children[personIndex]["medConsent"] = formMedConsent;
+                    children[personIndex]["photoConsent"] = formPhotoConsent;
+                    children[personIndex]["languages"] = languagesSelected;
+                    children[personIndex]["schoolId"] = personIndex.toString()
+
+
+                    response = await fetch("/updateChildren", {
+                        method: 'POST',
+                        body: JSON.stringify(children[personIndex])
+                    })
+                } else {
+                    response = await fetch("/submit", {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
 
                 if (response.ok) {
                     // Show the success message
@@ -177,3 +241,137 @@ async function initMap(elementName) {
 }
 initMap("addressSearch");
 initMap("addressSearchTwo")
+
+
+function openConditionModal(editIndex = -1) {
+    editingIndex = editIndex;
+    const modal = document.getElementById('conditionModal');
+    const form = document.getElementById('conditionForm');
+
+    if (editIndex >= 0) {
+        // Editing existing condition
+        const condition = children[personIndex]["conditions"][editIndex];
+        document.getElementById('conditionSelect').value = getConditionType(condition.groupId);
+        document.getElementById('medicationName').value = condition.treatment;
+        document.getElementById('conditionName').value = condition.type;
+        document.getElementById('conditionNotes').value = condition.furtherInfo || '';
+        document.querySelector('.modal-header h3').textContent = 'Edit Condition';
+        document.querySelector('.btn--primary').textContent = 'Update Condition';
+    } else {
+        // Adding new condition
+        form.reset();
+        document.querySelector('.modal-header h3').textContent = 'Add Condition';
+        document.querySelector('.btn--primary').textContent = 'Add Condition';
+    }
+
+    modal.style.display = 'block';
+}
+
+function closeConditionModal() {
+    document.getElementById('conditionModal').style.display = 'none';
+    editingIndex = -1;
+}
+
+function addCondition() {
+    const conditionTypeId = document.getElementById('conditionSelect').selectedOptions;
+    const conditionName = document.getElementById("conditionName").value;
+    const medication = document.getElementById('medicationName').value;
+    const notes = document.getElementById('conditionNotes').value;
+
+    if (!conditionTypeId || !medication || !conditionName) {
+        alert('Please provide a condition type, name and medication');
+        return;
+    }
+
+    const conditionData = {
+        groupId: parseInt(conditionTypeId[0].id.substring(8)),
+        type: conditionName,
+        treatment: medication,
+        furtherInfo: notes,
+        toBeUploaded: true,
+    };
+
+    if (editingIndex >= 0) {
+        // Update existing condition
+        let condition = children[personIndex]["conditions"][editingIndex]
+
+        condition.groupId = conditionData.groupId;
+        condition.type = conditionData.type;
+        condition.treatment = conditionData.treatment;
+        condition.furtherInfo = conditionData.furtherInfo;
+        condition.toBeUploaded = true;
+    } else {
+        // Add new condition
+        children[personIndex]["conditions"].push(conditionData);
+    }
+
+    renderConditionsTable();
+    closeConditionModal();
+
+    // Update hidden form field for submission
+}
+
+function deleteCondition(index) {
+    if (confirm('Are you sure you want to delete this condition?')) {
+        let toDelete = children[personIndex]["conditions"].splice(index, 1)[0];
+        children[personIndex]["toDelete"].push(toDelete)
+        renderConditionsTable();
+    }
+}
+
+function renderConditionsTable() {
+    const tbody = document.getElementById('conditionsBody');
+    const emptyState = document.getElementById('emptyState');
+    const table = document.getElementById('table')
+
+    tbody.innerHTML = '';
+
+    if (children[personIndex]["conditions"].length === 0) {
+        emptyState.classList.remove('hidden');
+        table.classList.remove('show');
+    } else {
+        emptyState.classList.add('hidden');
+        table.classList.add('show');
+
+        children[personIndex]["conditions"].forEach((condition, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${getConditionType(condition.groupId)}</td>
+                <td>${condition.type}</td>
+                <td>${getMedicationDisplayName(condition.treatment)}</td>
+                <td>${condition.furtherInfo || '-'}</td>
+                <td class="actions">
+                    <button type="button" class="btn--delete" onclick="deleteCondition(${index})">Delete</button>
+                    <button type="button" class="btn--edit" onclick="openConditionModal(${index})">Edit</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+}
+
+function getConditionType(value) {
+    let condType = document.getElementById("condType"+value)
+
+    return condType.innerHTML
+}
+
+function getMedicationDisplayName(value) {
+    const names = {
+        'ventolin': 'Ventolin',
+        'insulin': 'Insulin',
+        'epipen': 'EpiPen',
+        'ritalin': 'Ritalin',
+        'other': 'Other'
+    };
+    return names[value] || value;
+}
+
+
+// Close modal when clicking outside
+window.addEventListener('click', function(event) {
+    const modal = document.getElementById('conditionModal');
+    if (event.target === modal) {
+        closeConditionModal();
+    }
+});

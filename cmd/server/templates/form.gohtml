@@ -12,7 +12,6 @@
 <nav class="navbar">
     <div class="navbar__welcome">Welcome, <span class="navbar__user">{{.CurrentUserInfo.FirstName}} {{.CurrentUserInfo.Surname}}</span></div>
     <div>
-        <a href="/manage" class="btn--logout">Admin</a>
         <a href="/logout" class="btn--logout">Log Out</a>
     </div>
 </nav>
@@ -65,12 +64,37 @@
                         </svg>
                     </div>
                 </div>
+
+                <div class="contact-cards__header">
+                    <h2>Select Child</h2>
+                    <p id="selectContactSubtitle">Please choose the child to update</p>
+                </div>
+
+                <!-- Children Cards -->
+
+                {{range .ChildrenInfo}}
+                    {{if gt .Status 0}}
+                        <div id="childCard" class="contact-card" onclick="showChildForm('{{.SchoolId}}')">
+                            <div class="contact-card__content">
+                                <div id="childCardInitial" class="contact-card__avatar">P</div>
+                                <div class="contact-card__info">
+                                    <h3 class="contact-card__name">{{.Forename}} {{.Surname}}</h3>
+                                    <p class="contact-card__relationship">{{.YearName}}</p>
+                                </div>
+                            </div>
+                            <div class="contact-card__indicator">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M9 18l6-6-6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </div>
+                        </div>
+                    {{end}}
+                {{end}}
+
             </div>
         </div>
 
         <form id="primaryContactForm">
-            <!-- Example Form Fields - Customize these! -->
-
             <div class="form-group">
                 <label for="email" class="form-label">Email Address</label>
                 <input type="email" class="form-control" id="email" name="email" value="{{.ParentContactInfo.EmailAddress1}}" readonly>
@@ -178,28 +202,28 @@
             </div>
 
             <div class="form-group">
-                <label for="addressLine0" class="form-label">Address Line 1</label>
+                <label for="secondaryAddressLine0" class="form-label">Address Line 1</label>
                 <input type="text" class="form-control" id="secondaryAddressLine0" name="addressLineOne" placeholder="Enter in Address Search" value="{{or .ParentContactInfo.FirstLineAddress ""}}" readonly>
             </div>
 
             <div class="form-group">
-                <label for="addressLine1" class="form-label">Address Line 2</label>
+                <label for="secondaryAddressLine1" class="form-label">Address Line 2</label>
                 <input type="text" class="form-control" id="secondaryAddressLine1" name="addressLineTwo"  value="{{or .ParentContactInfo.SecondLineAddress ""}}" readonly>
             </div>
 
             <div class="form-group">
-                <label for="addressLine2" class="form-label">Address Line 3</label>
+                <label for="secondaryAddressLine2" class="form-label">Address Line 3</label>
                 <input type="text" class="form-control" id="secondaryAddressLine2" name="addressLineThree"  value="{{or .ParentContactInfo.ThirdLineAddress ""}}" readonly>
             </div>
 
             <div class="form-group">
-                <label for="postalCode" class="form-label">Post Code</label>
+                <label for="secondaryPostalCode" class="form-label">Post Code</label>
                 <input type="text" class="form-control" id="secondaryPostalCode" name="postalCode" value="{{or .ParentContactInfo.Postcode ""}}" readonly>
             </div>
 
             <div class="form-group">
-                <label for="county" class="form-label">County</label>
-                <input type="text" class="form-control" id="secondaryCounty" name="county" value="{{or .ParentContactInfo.County ""}}" readonly>
+                <label for="secondaryCounty" class="form-label">County</label>
+                <input type="text" class="form-control" id="secondaryCounty" name="secondaryCounty" value="{{or .ParentContactInfo.County ""}}" readonly>
             </div>
 
             <div class="form-group">
@@ -211,6 +235,115 @@
                 <button type="submit" class="btn--submit">Save Changes</button>
             </div>
         </form>
+
+        <form id="childForm">
+            <div class="form-group">
+                <label for="medsUsed" class="form-label">Medical Conditions</label>
+                <!-- Conditions Table -->
+                <div class="conditions-table" id="conditionsTable">
+                    <table id="table">
+                        <thead>
+                        <tr>
+                            <th>Condition Type</th>
+                            <th>Condition</th>
+                            <th>Medication</th>
+                            <th>Notes</th>
+                            <th>Actions</th>
+                        </tr>
+                        </thead>
+                        <tbody id="conditionsBody"></tbody>
+                    </table>
+
+                    <!-- Empty State -->
+                    <div class="empty-state" id="emptyState">
+                        <p>No medical conditions added yet.</p>
+                    </div>
+                </div>
+
+                <!-- Add Condition Button -->
+                <button type="button" class="btn--add-condition" onclick="openConditionModal()">
+                    + Add Condition
+                </button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Consent to administer general medication</label>
+                <div class="radio-group">
+                    <input type="radio" id="yes-med-consent" name="medConsent" value="yes" class="radio-input">
+                    <label for="yes-med-consent" class="radio-label">Yes</label>
+
+                    <input type="radio" id="no-med-consent" name="medConsent" value="no" class="radio-input">
+                    <label for="no-med-consent" class="radio-label">No</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Permission to use images of your child for internal and external marketing</label>
+                <div class="radio-group">
+                    <input type="radio" id="yes-photo-consent" name="photoConsent" value="yes" class="radio-input">
+                    <label for="yes-photo-consent" class="radio-label">Yes</label>
+
+                    <input type="radio" id="no-photo-consent" name="photoConsent" value="no" class="radio-input">
+                    <label for="no-photo-consent" class="radio-label">No</label>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="ealSpoken" class="form-label">If your child has english as an additional language, please select their other fluent languages.</label>
+                <select id="ealSpoken" name="ealSpoken" class="form-control" multiple>
+                    {{range $.Languages}}
+                        <option value="{{.Name}}" id="{{.Name}}">{{.Name}}</option>
+                    {{end}}
+                </select>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn--submit">Save Changes</button>
+            </div>
+        </form>
+
+        <!-- Condition Modal -->
+        <div class="modal" id="conditionModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add Medical Condition</h3>
+                    <button type="button" class="modal-close" onclick="closeConditionModal()">&times;</button>
+                </div>
+
+                <form id="conditionForm" class="modal-body">
+                    <div class="form-group">
+                        <label for="conditionSelect" class="form-label">Condition Type *</label>
+                        <select id="conditionSelect" class="form-control" required>
+                            <option value="">Select a condition</option>
+                            {{range .ConditionTypes}}
+                                <option id="condType{{.Id}}" value="{{.Name}}">{{.Name}}</option>
+                            {{end}}
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conditionName" class="form-label">Condition *</label>
+                        <input type="text" id="conditionName" class="form-control" placeholder="Condition Name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="medicationName" class="form-label">Medication *</label>
+                        <input type="text" id="medicationName" class="form-control" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="conditionNotes" class="form-label">Notes</label>
+                        <textarea id="conditionNotes" class="form-control" rows="3" placeholder="Additional notes about this condition and medication"></textarea>
+                    </div>
+                </form>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn--secondary" onclick="closeConditionModal()">Cancel</button>
+                    <button type="button" class="btn--primary" onclick="addCondition()">Add Condition</button>
+                </div>
+            </div>
+        </div>
 
         <div id="success-message" class="alert alert-success" style="display: none;">
             <strong>Thank you!</strong> Your details have been successfully updated.

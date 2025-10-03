@@ -12,14 +12,14 @@ import (
 func LoginUser(email string, password string) (models.SessionData, error) {
 	var baseUrl string
 
-	if baseUrl = os.Getenv("BASE-URL"); baseUrl == "" {
+	if baseUrl = os.Getenv("BASE_URL"); baseUrl == "" {
 		baseUrl = "https://fidelis.isams.cloud/Legacy/Api/Rest/1.0"
 	}
 
 	endpoint := baseUrl + "/portals/New%20Portal%20API%20Key/login"
 
 	body := models.LoginBody{
-		ApiKey:   os.Getenv("API-KEY"),
+		ApiKey:   os.Getenv("API_KEY"),
 		Password: password,
 		Portal:   "New Portal API Key",
 		UserName: email,

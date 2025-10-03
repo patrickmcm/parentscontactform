@@ -11,7 +11,7 @@ import (
 func GetContactInfo(sessionId string) ([]models.ParentContactInfo, error) {
 	var baseUrl string
 
-	if baseUrl = os.Getenv("BASE-URL"); baseUrl == "" {
+	if baseUrl = os.Getenv("BASE_URL"); baseUrl == "" {
 		baseUrl = "https://fidelis.isams.cloud/Legacy/Api/Rest/1.0"
 	}
 
@@ -52,7 +52,7 @@ func GetContactInfo(sessionId string) ([]models.ParentContactInfo, error) {
 func GetUserAccountDetails(data *models.SessionData) (models.CurrentUserInfo, error) {
 	var baseUrl string
 
-	if baseUrl = os.Getenv("BASE-URL"); baseUrl == "" {
+	if baseUrl = os.Getenv("BASE_URL"); baseUrl == "" {
 		baseUrl = "https://fidelis.isams.cloud/Legacy/Api/Rest/1.0"
 	}
 
@@ -93,7 +93,7 @@ func GetUserAccountDetails(data *models.SessionData) (models.CurrentUserInfo, er
 func GetUserChildren(data *models.SessionData) ([]models.ChildInfo, error) {
 	var baseUrl string
 
-	if baseUrl = os.Getenv("BASE-URL"); baseUrl == "" {
+	if baseUrl = os.Getenv("BASE_URL"); baseUrl == "" {
 		baseUrl = "https://fidelis.isams.cloud/Legacy/Api/Rest/1.0"
 	}
 

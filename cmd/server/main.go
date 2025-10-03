@@ -1,6 +1,8 @@
 package main
 
 import (
+	"embed"
+	"io/fs"
 	"log"
 	"net/http"
 	"os"
@@ -8,6 +10,12 @@ import (
 	"parentscontactform/internal/client"
 	"parentscontactform/internal/handlers"
 )
+
+//go:embed templates/*.gohtml
+var templateFS embed.FS
+
+//go:embed static/*
+var staticFS embed.FS
 
 func main() {
 	prod := os.Getenv("PROD")
@@ -26,18 +34,22 @@ func main() {
 		log.Fatal("Failed to init iSAMS API Client")
 	}
 
-	handlers.RestClient = c
+	handler := handlers.NewHandler(staticFS, templateFS, c)
 
-	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.Dir("/Users/patrickmcm/GolandProjects/parentscontactform/cmd/server/static"))))
+	staticSubFS, _ := fs.Sub(staticFS, "static")
+	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.FS(staticSubFS))))
 
-	http.HandleFunc("/", handlers.HandleLoginGet)
-	http.HandleFunc("/login", handlers.HandleLoginPost)
-	http.HandleFunc("/logout", handlers.HandleLogoutGet)
-	http.HandleFunc("/form", handlers.HandleFormGet)
-	http.HandleFunc("/children", handlers.HandleChildFormGet)
-	http.HandleFunc("/updateChildren", handlers.HandleChildFormPost)
-	http.HandleFunc("/callback", handlers.HandleCallback)
-	http.HandleFunc("/submit", handlers.HandleFormPost)
+	http.HandleFunc("/", handler.HandleLoginGet)
+	http.HandleFunc("/login", handler.HandleLoginPost)
+	http.HandleFunc("/logout", handler.HandleLogoutGet)
+	http.HandleFunc("/form", handler.HandleFormGet)
+	http.HandleFunc("/children", handler.HandleChildFormGet)
+	http.HandleFunc("/updateChildren", handler.HandleChildFormPost)
+	http.HandleFunc("/callback", handler.HandleCallback)
+	http.HandleFunc("/submit", handler.HandleFormPost)
 
-	http.ListenAndServe(":3000", nil)
+	err = http.ListenAndServe(os.Getenv("PORT"), nil)
+	if err != nil {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

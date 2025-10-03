@@ -12,7 +12,7 @@ import (
 	"parentscontactform/internal/util"
 )
 
-func HandleLoginGet(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLoginGet(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err == nil {
 		if _, exists := session.Get(cookie.Value); exists {
@@ -20,7 +20,7 @@ func HandleLoginGet(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	loginHtml, err := os.ReadFile("/Users/patrickmcm/GolandProjects/parentscontactform/cmd/server/static/login.html")
+	loginHtml, err := h.staticFS.ReadFile("static/login.html")
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -29,7 +29,7 @@ func HandleLoginGet(w http.ResponseWriter, r *http.Request) {
 	w.Write(loginHtml)
 }
 
-func HandleLoginPost(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
 		middleware.LogAndError(r, w, "Error parsing form", err.Error(), http.StatusBadRequest)
 		return
@@ -74,7 +74,7 @@ func HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, authURL, http.StatusFound)
 }
 
-func HandleLogoutGet(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleLogoutGet(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
 		// No cookie, not logged in
@@ -97,7 +97,7 @@ func HandleLogoutGet(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
-func HandleCallback(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 	cookie, err := r.Cookie("session_id")
 	if err != nil {

@@ -206,7 +206,7 @@ func (h *Handler) HandleChildFormGet(w http.ResponseWriter, r *http.Request) {
 
 	encoded, err := json.Marshal(childrenInfo)
 	if err != nil {
-		middleware.LogAndError(r, w, "Unable to marshal children info", err.Error(), http.StatusInternalServerError)
+		middleware.LogAndError(r, w, "Unable to access your children's info", err.Error(), http.StatusInternalServerError)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -219,7 +219,7 @@ func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
 		// No cookie, not logged in
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -227,7 +227,7 @@ func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		// Session not found (e.g., server was restarted)
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -427,7 +427,7 @@ func (h *Handler) HandleFormPost(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
 		// No cookie, not logged in
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -441,7 +441,7 @@ func (h *Handler) HandleFormPost(w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		// Session not found (e.g., server was restarted)
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -586,11 +586,16 @@ func (h *Handler) HandleFormPost(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	resp, err := c.PatchApiPortalsAccountStudentsSchoolIdContactsContactIdWithResponse(ctx, parentChildren[0].SchoolId, contactInfo[0].Id, nil, updatedContactBody)
+	updateStudentResp, err := c.PatchApiPortalsAccountStudentsSchoolIdContactsContactIdWithResponse(ctx, parentChildren[0].SchoolId, contactInfo[0].Id, nil, updatedContactBody)
 	if err != nil {
 		middleware.LogAndError(r, w, "Unable to update iSAMS record", err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	fmt.Fprint(w, string(resp.Body))
+	if updateStudentResp.StatusCode() != http.StatusOK {
+		middleware.LogAndError(r, w, "You are not linked to your child's account. Please ensure you can see your child at fideliscollege.parents.isams.cloud", string(updateStudentResp.Body), http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Fprint(w, "OK")
 }

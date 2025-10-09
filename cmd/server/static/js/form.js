@@ -88,7 +88,7 @@ function showChildForm(schoolId) {
     })
 }
 
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     const successMessage = document.getElementById('success-message');
     const selectContactSubtitle = document.getElementById("selectContactSubtitle")
 
@@ -165,7 +165,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Optional: Scroll to the success message
                     successMessage.scrollIntoView({ behavior: 'smooth' });
                 } else {
-                    alert('There was a problem saving your details. Please refresh the page and try again.');
+                    alert("Error: "+await response.text());
                 }
 
             } catch (error) {

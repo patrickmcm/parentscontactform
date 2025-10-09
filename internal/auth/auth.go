@@ -3,6 +3,7 @@ package auth
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"os"
@@ -39,11 +40,21 @@ func LoginUser(email string, password string) (models.SessionData, error) {
 		return temp, err
 	}
 
+	if resp.StatusCode == http.StatusUnauthorized {
+		var temp models.SessionData
+		return temp, errors.New("incorrect username or password")
+	}
+
 	responseBodyBuf, err := io.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
 		var temp models.SessionData
 		return temp, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		var temp models.SessionData
+		return temp, errors.New("error while logging in: " + string(responseBodyBuf))
 	}
 
 	var responseBody models.LoginResponse

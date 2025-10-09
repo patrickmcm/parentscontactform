@@ -29,3 +29,16 @@ func LogAndError(r *http.Request, w http.ResponseWriter, friendlyErrMsg string, 
 	)
 	http.Error(w, friendlyErrMsg, code)
 }
+
+func Log(r *http.Request, errMsg string, code int) {
+	log.Printf(
+		"ERROR: %s %s %d %s %s %s %s %s %s",
+		r.Method,
+		r.URL.Path,
+		code,
+		r.RemoteAddr,
+		r.UserAgent(),
+		r.Referer(),
+		errMsg,
+	)
+}

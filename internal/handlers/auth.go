@@ -41,7 +41,8 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	sessionId := util.GenerateRandomString(16)
 	sessionData, err := auth.LoginUser(email, password)
 	if err != nil {
-		middleware.LogAndError(r, w, "Server Error", err.Error(), http.StatusInternalServerError)
+		middleware.Log(r, err.Error(), http.StatusInternalServerError)
+		http.Redirect(w, r, "/?error="+err.Error(), http.StatusFound)
 		return
 	}
 
@@ -102,7 +103,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
 		// No cookie, not logged in
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 
@@ -110,7 +111,7 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	if !exists {
 		// Session not found (e.g., server was restarted)
-		http.Redirect(w, r, "/login", http.StatusFound)
+		http.Redirect(w, r, "/", http.StatusFound)
 		return
 	}
 

@@ -84,6 +84,8 @@ type ChildFormInfo struct {
 	Conditions   Conditions `json:"conditions"`
 	PhotoConsent bool       `json:"photoConsent"`
 	MedConsent   bool       `json:"medConsent"`
+	TripsConsent bool       `json:"tripsConsent"`
+	IsEal        bool       `json:"isEal"`
 	Languages    []string   `json:"languages"`
 	ToBeUpdated  bool       `json:"toBeUpdated"`
 }
@@ -109,6 +111,8 @@ type ChildFormInfoRequestBody struct {
 	ToDelete     []RequestBodyCondition `json:"toDelete"`
 	PhotoConsent bool                   `json:"photoConsent"`
 	MedConsent   bool                   `json:"medConsent"`
+	TripsConsent bool                   `json:"tripsConsent"`
+	IsEal        bool                   `json:"isEal"`
 	Languages    []string               `json:"languages"`
 }
 

@@ -75,6 +75,18 @@ function showChildForm(schoolId) {
             document.getElementById("no-med-consent").checked = true
         }
 
+        if(children[personIndex]["tripsConsent"]) {
+            document.getElementById("yes-trips-consent").checked = true
+        } else {
+            document.getElementById("no-trips-consent").checked = true
+        }
+
+        if(children[personIndex]["isEal"]) {
+            document.getElementById("yes-eal").checked = true
+        } else {
+            document.getElementById("no-eal").checked = true
+        }
+
         children[personIndex]["toDelete"] = []
 
         for (const lang of children[personIndex]["languages"]) {
@@ -136,11 +148,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                 if(form.id === "childForm") {
                     let formPhotoConsent = formData.get("photoConsent") === "yes"
                     let formMedConsent = formData.get("medConsent") === "yes"
+                    let isEal = formData.get("isEal") === "yes"
+                    let tripsConsent = formData.get("tripsConsent") === "yes"
+
                     let languagesSelected = formData.getAll("ealSpoken")
 
                     children[personIndex]["medConsent"] = formMedConsent;
                     children[personIndex]["photoConsent"] = formPhotoConsent;
+                    children[personIndex]["tripsConsent"] = tripsConsent;
                     children[personIndex]["languages"] = languagesSelected;
+                    children[personIndex]["isEal"] = isEal;
                     children[personIndex]["schoolId"] = personIndex.toString()
 
 

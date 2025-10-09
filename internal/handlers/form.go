@@ -191,6 +191,36 @@ func (h *Handler) HandleChildFormGet(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		isEalResp, err := h.RestClient.GetApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, child.SchoolId, 35, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if isEalResp.JSON200 != nil {
+			customField := *(*isEalResp.JSON200.CustomFields)[0].Value
+			if customField == "true" {
+				childFormInfo.IsEal = true
+			} else {
+				childFormInfo.IsEal = false
+			}
+		}
+
+		tripsConsentResp, err := h.RestClient.GetApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, child.SchoolId, 29, nil)
+		if err != nil {
+			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		if tripsConsentResp.JSON200 != nil {
+			customField := *(*tripsConsentResp.JSON200.CustomFields)[0].Value
+			if customField == "true" {
+				childFormInfo.TripsConsent = true
+			} else {
+				childFormInfo.TripsConsent = false
+			}
+		}
+
 		studentResp, err := h.RestClient.GetApiStudentsSchoolIdWithResponse(ctx, child.SchoolId, nil)
 		if err != nil {
 			middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
@@ -394,6 +424,25 @@ func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// eal
+	isEal := "false"
+	if childInfo.IsEal {
+		isEal = "true"
+	}
+
+	isEalBody := client.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdJSONRequestBody{
+		Value: &isEal,
+	}
+
+	isEalFieldResp, err := h.RestClient.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, childInfo.SchoolId, 35, nil, isEalBody)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if isEalFieldResp.StatusCode() != 200 {
+		middleware.LogAndError(r, w, "Unable to update condition", string(isEalFieldResp.Body), http.StatusInternalServerError)
+		return
+	}
 
 	currentStudentInfoResp, err := h.RestClient.GetApiStudentsSchoolIdWithResponse(ctx, childInfo.SchoolId, nil)
 	if err != nil {
@@ -408,13 +457,41 @@ func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
 
 	updatedStudentBody := util.InitStudent(currentStudentInfoResp.JSON200)
 
-	childInfo.Languages = append(childInfo.Languages, "English")
+	for i, v := range childInfo.Languages {
+		if v == "English" {
+			break
+		} else if i == len(childInfo.Languages)-1 {
+			childInfo.Languages = append(childInfo.Languages, "English")
+		}
+	}
 
 	updatedStudentBody.Languages = &childInfo.Languages
 
 	updatedLangsResp, err := h.RestClient.PutApiStudentsSchoolIdWithResponse(ctx, childInfo.SchoolId, nil, updatedStudentBody)
 	if err != nil || updatedLangsResp.StatusCode() != 200 {
 		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// trips consent
+
+	tripsConsent := "false"
+	if childInfo.TripsConsent {
+		tripsConsent = "true"
+	}
+
+	tripsConsentBody := client.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdJSONRequestBody{
+		Value: &tripsConsent,
+	}
+
+	tripsConsentResp, err := h.RestClient.PatchApiStudentsSchoolIdCustomFieldsCustomFieldIdWithResponse(ctx, childInfo.SchoolId, 29, nil, tripsConsentBody)
+	if err != nil {
+		middleware.LogAndError(r, w, "Unable to connect to iSAMS", err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	if tripsConsentResp.StatusCode() != 200 {
+		middleware.LogAndError(r, w, "Unable to update condition", string(tripsConsentResp.Body), http.StatusInternalServerError)
 		return
 	}
 

@@ -12,6 +12,7 @@ import (
 	"parentscontactform/internal/auth"
 	"parentscontactform/internal/client"
 	"parentscontactform/internal/handlers"
+	"time"
 )
 
 //go:embed templates/*.gohtml
@@ -54,20 +55,27 @@ func main() {
 
 	handler := handlers.NewHandler(staticFS, templateFS, c)
 
+	mux := http.NewServeMux()
+
 	staticSubFS, _ := fs.Sub(staticFS, "static")
-	http.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.FS(staticSubFS))))
+	mux.Handle("/static/", http.StripPrefix("/static", http.FileServer(http.FS(staticSubFS))))
 
-	http.HandleFunc("/", sentryHandler.HandleFunc(handler.HandleLoginGet))
-	http.HandleFunc("/login", sentryHandler.HandleFunc(handler.HandleLoginPost))
-	http.HandleFunc("/logout", sentryHandler.HandleFunc(handler.HandleLogoutGet))
-	http.HandleFunc("/form", sentryHandler.HandleFunc(handler.HandleFormGet))
-	http.HandleFunc("/children", sentryHandler.HandleFunc(handler.HandleChildFormGet))
-	http.HandleFunc("/updateChildren", sentryHandler.HandleFunc(handler.HandleChildFormPost))
-	http.HandleFunc("/callback", sentryHandler.HandleFunc(handler.HandleCallback))
-	http.HandleFunc("/submit", sentryHandler.HandleFunc(handler.HandleFormPost))
+	mux.HandleFunc("/", sentryHandler.HandleFunc(handler.HandleLoginGet))
+	mux.HandleFunc("/login", sentryHandler.HandleFunc(handler.HandleLoginPost))
+	mux.HandleFunc("/logout", sentryHandler.HandleFunc(handler.HandleLogoutGet))
+	mux.HandleFunc("/form", sentryHandler.HandleFunc(handler.HandleFormGet))
+	mux.HandleFunc("/children", sentryHandler.HandleFunc(handler.HandleChildFormGet))
+	mux.HandleFunc("/updateChildren", sentryHandler.HandleFunc(handler.HandleChildFormPost))
+	mux.HandleFunc("/callback", sentryHandler.HandleFunc(handler.HandleCallback))
+	mux.HandleFunc("/submit", sentryHandler.HandleFunc(handler.HandleFormPost))
 
-	err = http.ListenAndServe(os.Getenv("PORT"), nil)
-	if err != nil {
-		log.Fatalf("Failed to start server: %v", err)
+	srv := http.Server{
+		Addr:         os.Getenv("PORT"),
+		Handler:      mux,
+		ReadTimeout:  10 * time.Second,
+		WriteTimeout: 10 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
+
+	log.Fatal(srv.ListenAndServe())
 }

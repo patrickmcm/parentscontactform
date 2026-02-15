@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"golang.org/x/oauth2"
 	"net/http"
 	"os"
@@ -26,7 +25,9 @@ func (h *Handler) HandleLoginGet(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
 
-	w.Write(loginHtml)
+	if _, err = w.Write(loginHtml); err != nil {
+		return
+	}
 }
 
 func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
@@ -38,7 +39,7 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	email := r.FormValue("email")
 	password := r.FormValue("password")
 
-	sessionId := util.GenerateRandomString(16)
+	tempSessionId := util.GenerateRandomString(16)
 	sessionData, err := auth.LoginUser(email, password)
 	if err != nil {
 		middleware.Log(r, err.Error(), http.StatusInternalServerError)
@@ -46,17 +47,18 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session.Set(sessionId, &sessionData)
+	session.Set(tempSessionId, &sessionData)
 
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_id",
-		Value:    sessionId,
+		Value:    tempSessionId,
 		Path:     "/",
 		MaxAge:   24 * 7 * 60 * 60,
 		HttpOnly: true,
 		Secure:   os.Getenv("PROD") != "",
 	})
 
+	// Start of [Authentication request 3.1.2.1]
 	state := util.GenerateRandomString(32)
 
 	http.SetCookie(w, &http.Cookie{
@@ -69,7 +71,7 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	authURL := auth.Cfg.AuthCodeURL(
 		state,
-		oauth2.SetAuthURLParam("response_mode", "form_post"),
+		oauth2.SetAuthURLParam("response_mode", "form_post"), // not really needed, since confidental client
 	)
 
 	http.Redirect(w, r, authURL, http.StatusFound)
@@ -99,7 +101,8 @@ func (h *Handler) HandleLogoutGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
+
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
 		// No cookie, not logged in
@@ -138,9 +141,9 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 	})
 
-	// Exchange code for tokens
+	// Exchange code for id_token and access token
 	code := r.FormValue("code")
-	token, err := auth.Cfg.Exchange(context.Background(), code)
+	token, err := auth.Cfg.Exchange(ctx, code)
 	if err != nil {
 		middleware.LogAndError(r, w, "token exchange failed", err.Error(), http.StatusInternalServerError)
 		return
@@ -171,7 +174,48 @@ func (h *Handler) HandleCallback(w http.ResponseWriter, r *http.Request) {
 
 	sessionData.ISAMSToken = isamsTokenData
 
-	session.Set(cookie.Value, sessionData)
+	// change session ID to use the one provided by the IdP so that we can find the session for any backchannel logout reqs
+	session.Set(isamsTokenData.UserClaims.SessionId, sessionData)
+	session.Delete(cookie.Value)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_id",
+		Value:    isamsTokenData.UserClaims.SessionId,
+		Path:     "/",
+		MaxAge:   24 * 7 * 60 * 60,
+		HttpOnly: true,
+		Secure:   os.Getenv("PROD") != "",
+	})
 
 	http.Redirect(w, r, "/form", http.StatusFound)
+}
+
+func (h *Handler) HandleBackChannelLogout(w http.ResponseWriter, r *http.Request) {
+	logoutToken := r.FormValue("logout_token")
+	if logoutToken == "" {
+		middleware.LogAndError(r, w, "missing logout_token", "missing logout_token", http.StatusBadRequest)
+		return
+	}
+
+	// we verify logout tokens the same way as id tokens mostly
+	verifiedToken, err := auth.Verifier.Verify(r.Context(), logoutToken)
+	if err != nil {
+		middleware.LogAndError(r, w, "failed to verify logout_token", err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	var logoutClaims models.LogoutToken
+	if err = verifiedToken.Claims(&logoutClaims); err != nil {
+		middleware.LogAndError(r, w, "failed to retrive sid", err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	_, ok := logoutClaims.Events["http://schemas.openid.net/event/backchannel-logout"]
+	if !ok {
+		middleware.LogAndError(r, w, "malformed event claim", "malformed event claim", http.StatusBadRequest)
+		return
+	}
+
+	session.Delete(logoutClaims.SessionId)
+	w.WriteHeader(http.StatusOK)
 }

@@ -13,9 +13,15 @@ type LoginResponse struct {
 }
 
 type ClaimExtract struct {
+	SessionId string `json:"sid"`
 	UserCode  string `json:"sub"`
 	ISAMSGuid string `json:"iSAMS.PersonId"`
 	Email     string `json:"email"`
 	Forename  string `json:"name"`
 	Surname   string `json:"family_name"`
+}
+
+type LogoutToken struct {
+	SessionId string                 `json:"sid"`
+	Events    map[string]interface{} `json:"events"`
 }

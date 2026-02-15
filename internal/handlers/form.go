@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -29,7 +28,7 @@ func NewHandler(staticFS embed.FS, templateFS embed.FS, restClient *client.Clien
 }
 
 func (h *Handler) HandleFormGet(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	// 1. Get the session cookie
 	cookie, err := r.Cookie("session_id")
@@ -118,7 +117,7 @@ func (h *Handler) HandleFormGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleChildFormGet(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	// 1. Get the session cookie
 	cookie, err := r.Cookie("session_id")
@@ -244,7 +243,7 @@ func (h *Handler) HandleChildFormGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	cookie, err := r.Cookie("session_id")
 	if err != nil {
@@ -499,7 +498,7 @@ func (h *Handler) HandleChildFormPost(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleFormPost(w http.ResponseWriter, r *http.Request) {
-	ctx := context.Background()
+	ctx := r.Context()
 
 	cookie, err := r.Cookie("session_id")
 	if err != nil {

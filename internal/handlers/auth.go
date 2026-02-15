@@ -204,6 +204,8 @@ func (h *Handler) HandleBackChannelLogout(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// but three extra things to verify, sid + event claim and no nonce being sent
+
 	var logoutClaims models.LogoutToken
 	if err = verifiedToken.Claims(&logoutClaims); err != nil {
 		middleware.LogAndError(r, w, "failed to retrive sid", err.Error(), http.StatusBadRequest)
@@ -213,6 +215,11 @@ func (h *Handler) HandleBackChannelLogout(w http.ResponseWriter, r *http.Request
 	_, ok := logoutClaims.Events["http://schemas.openid.net/event/backchannel-logout"]
 	if !ok {
 		middleware.LogAndError(r, w, "malformed event claim", "malformed event claim", http.StatusBadRequest)
+		return
+	}
+
+	if logoutClaims.Nonce != "" {
+		middleware.LogAndError(r, w, "malformed logout claim", "malformed logout claim", http.StatusBadRequest)
 		return
 	}
 

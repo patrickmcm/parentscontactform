@@ -24,4 +24,5 @@ type ClaimExtract struct {
 type LogoutToken struct {
 	SessionId string                 `json:"sid"`
 	Events    map[string]interface{} `json:"events"`
+	Nonce     string                 `json:"nonce"`
 }

@@ -68,6 +68,7 @@ func main() {
 	mux.HandleFunc("/updateChildren", sentryHandler.HandleFunc(handler.HandleChildFormPost))
 	mux.HandleFunc("/callback", sentryHandler.HandleFunc(handler.HandleCallback))
 	mux.HandleFunc("/submit", sentryHandler.HandleFunc(handler.HandleFormPost))
+	mux.HandleFunc("/backchannel", sentryHandler.HandleFunc(handler.HandleBackChannelLogout))
 
 	srv := http.Server{
 		Addr:         os.Getenv("PORT"),

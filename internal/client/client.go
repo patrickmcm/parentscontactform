@@ -14,14 +14,19 @@ const BASE_URL = "https://fidelis.isams.cloud"
 
 func GetHTTPClient() APIClient {
 	clientSecret := os.Getenv("ISAMS_REST_CLIENT_SECRET")
+	clientId := os.Getenv("ISAMS_REST_CLIENT_ID")
 
 	if clientSecret == "" {
 		log.Fatalln("Couldn't find ISAMS_REST_CLIENT_SECRET env var")
 	}
 
+	if clientId == "" {
+		log.Fatalln("Couldn't find ISAMS_REST_CLIENT_ID env var")
+	}
+
 	ctx := context.Background()
 	conf := clientcredentials.Config{
-		ClientID:       "982A09D3-E738-4597-8270-310593223716",
+		ClientID:       clientId,
 		ClientSecret:   clientSecret,
 		TokenURL:       BASE_URL + "/auth/connect/token",
 		Scopes:         []string{"restapi"},
